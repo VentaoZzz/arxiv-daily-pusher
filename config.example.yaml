@@ -1,0 +1,21 @@
+# 研究组配置
+groups:
+  - name: "Group A - Example Topic"
+    keywords:
+      - "machine learning"
+      - "deep learning"
+
+  - name: "Group B - Another Topic"
+    keywords:
+      - "computer vision"
+      - "image processing"
+
+# 飞书 Webhook URL（必填）
+# 获取方式：飞书群设置 → 群机器人 → 添加自定义机器人 → 复制 Webhook 地址
+feishu_webhook: "PASTE_YOUR_WEBHOOK_URL_HERE"
+
+# 全局设置
+top_k: 6                    # 每组推送论文数
+timezone_offset: 8          # 时区偏移（北京时间=8，UTC=0）
+api_mode: "auto"            # API 模式: auto | arxiv_only | http_only
+push_strategy: "per_group"  # 推送策略: per_group (每组单独推送) | single (合并推送)
