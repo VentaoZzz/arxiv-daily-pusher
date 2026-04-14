@@ -19,7 +19,7 @@
 clawhub install arxiv-daily-pusher
 
 # 或手动克隆
-git clone https://github.com/YOUR_USERNAME/arxiv-daily-pusher.git
+git clone https://github.com/VentaoZzz/arxiv-daily-pusher.git
 cd arxiv-daily-pusher
 pip install -r requirements.txt
 ```
