@@ -8,41 +8,13 @@ Fetches arXiv papers with automatic fallback mechanism.
 import arxiv
 import requests
 import time
-import signal
 from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree as ET
-from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Optional
 
 
 TZ_LOCAL = timezone(timedelta(hours=8))
-
-
-# ==========================================================================
-# Timeout Protection (for arxiv library method)
-# ==========================================================================
-
-
-class TimeoutException(Exception):
-    """Raised when operation times out"""
-
-    pass
-
-
-@contextmanager
-def time_limit(seconds: int):
-    """Context manager for timeout (Unix/Linux/macOS only)."""
-
-    def signal_handler(signum, frame):
-        raise TimeoutException(f"Timed out after {seconds}s")
-
-    old_handler = signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
 
 
 # ==========================================================================
@@ -75,18 +47,14 @@ def build_date_query(keyword: str, start_utc: datetime, end_utc: datetime) -> st
 # ==========================================================================
 
 
-def fetch_with_arxiv_library(
+def _fetch_arxiv_library_worker(
     keyword: str,
     start_utc: datetime,
     end_utc: datetime,
     tz_offset_hours: int,
-    max_results: int = 50,
-    timeout_seconds: int = 60,
-) -> Optional[list[dict]]:
-    """Fetch papers using arxiv library with timeout protection.
-
-    Returns None if timeout or error occurs.
-    """
+    max_results: int,
+) -> list[dict]:
+    """Worker function executed in a thread for timeout protection."""
 
     query = build_date_query(keyword, start_utc, end_utc)
     client = arxiv.Client(page_size=max_results, delay_seconds=3.0, num_retries=2)
@@ -100,28 +68,49 @@ def fetch_with_arxiv_library(
     papers = []
     local_tz = timezone(timedelta(hours=tz_offset_hours))
 
-    try:
-        with time_limit(timeout_seconds):
-            for result in client.results(search):
-                arxiv_id = result.entry_id.split("/abs/")[-1]
-                published_local = result.published.astimezone(local_tz)
-                papers.append(
-                    {
-                        "title": result.title.strip().replace("\n", " "),
-                        "abstract": result.summary.strip().replace("\n", " "),
-                        "arxiv_id": arxiv_id,
-                        "alphaxiv_url": f"https://alphaxiv.org/overview/{arxiv_id}",
-                        "published_local": published_local.strftime("%Y-%m-%d %H:%M"),
-                        "matched_keyword": keyword,
-                    }
-                )
-        return papers
+    for result in client.results(search):
+        arxiv_id = result.entry_id.split("/abs/")[-1]
+        published_local = result.published.astimezone(local_tz)
+        papers.append(
+            {
+                "title": result.title.strip().replace("\n", " "),
+                "abstract": result.summary.strip().replace("\n", " "),
+                "arxiv_id": arxiv_id,
+                "alphaxiv_url": f"https://alphaxiv.org/overview/{arxiv_id}",
+                "published_local": published_local.strftime("%Y-%m-%d %H:%M"),
+                "matched_keyword": keyword,
+            }
+        )
 
-    except TimeoutException:
+    return papers
+
+
+def fetch_with_arxiv_library(
+    keyword: str,
+    start_utc: datetime,
+    end_utc: datetime,
+    tz_offset_hours: int,
+    max_results: int = 50,
+    timeout_seconds: int = 60,
+) -> Optional[list[dict]]:
+    """Fetch papers using arxiv library with timeout protection.
+
+    Uses concurrent.futures for cross-platform timeout (Windows/Linux/macOS).
+    Returns None if timeout or error occurs.
+    """
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                _fetch_arxiv_library_worker,
+                keyword, start_utc, end_utc, tz_offset_hours, max_results,
+            )
+            return future.result(timeout=timeout_seconds)
+
+    except FuturesTimeoutError:
         print(f"     ⚠ arxiv library timeout ({timeout_seconds}s)")
         return None
     except Exception as e:
-        # Add richer diagnostics: exception type + message
         print(f"     ⚠ arxiv library error ({type(e).__name__}): {e}")
         return None
 

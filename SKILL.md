@@ -8,6 +8,8 @@ Automatically fetch yesterday's arXiv papers, rank by keyword relevance, and pus
 - Smart scoring: title matches weighted 2x, abstract 1x
 - Dual-mode API: arxiv library with automatic HTTP fallback
 - Per-group or single message push strategies
+- Built-in scheduler (`--schedule HH:MM`) — no cron needed
+- Cross-platform: Windows / Linux / macOS
 
 ## Schedule
 ```yaml
@@ -17,7 +19,7 @@ Runs daily at 10:30 AM Beijing Time (02:30 UTC).
 
 ## Requirements
 - Python 3.10+
-- Dependencies: `arxiv`, `PyYAML`, `requests`
+- Dependencies: `arxiv`, `PyYAML`, `requests`, `schedule`
 - Feishu Incoming Webhook URL
 
 ## Quick Start
@@ -33,9 +35,14 @@ cp config.example.yaml config.yaml
 # Edit config.yaml with your webhook URL and keywords
 ```
 
-3. **Run:**
+3. **Run (single):**
 ```bash
 python main.py
+```
+
+4. **Run (scheduled, daily at 10:30):**
+```bash
+python main.py --schedule 10:30
 ```
 
 ## Configuration
@@ -48,8 +55,6 @@ See `config.example.yaml` for full configuration options:
 - `api_mode`: "auto" | "arxiv_only" | "http_only"
 - `push_strategy`: "per_group" | "single"
 
-## Manual Test
-```bash
-cd ~/.openclaw/skills/arxiv-daily-pusher
-python main.py
-```
+## Feishu Setup
+
+See `arxiv-daily-pusher-feishu-demo.pdf` for a detailed step-by-step guide.

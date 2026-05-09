@@ -1,8 +1,15 @@
 """
-Phase 2 entry point: Scheduled skill that pushes to Feishu.
+arXiv Daily Paper Pusher - Entry point.
+
+Usage:
+    python main.py                  # Run once (default)
+    python main.py --schedule 10:30 # Run daily at 10:30 (local time), stays alive
 """
 
+import argparse
+import time
 import yaml
+import schedule
 from datetime import timedelta, timezone
 
 from fetch_papers import fetch_papers_for_group, get_yesterday_range_utc
@@ -15,7 +22,9 @@ def load_config(path: str = "config.yaml") -> dict:
         return yaml.safe_load(f)
 
 
-def main():
+def run_once():
+    """Execute one full fetch-rank-push cycle."""
+
     config = load_config()
     tz_offset = config.get("timezone_offset", 8)
     top_k = config.get("top_k", 6)
@@ -55,7 +64,59 @@ def main():
     print(f"\n📤 Pushing to Feishu (strategy: {push_strategy})...")
     push_to_feishu(webhook_url, group_results, date_range, push_strategy)
 
-    print("\n✅ Phase 2 complete.")
+    print("\n✅ Done.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="arXiv Daily Paper Pusher — fetch, rank, push to Feishu"
+    )
+    parser.add_argument(
+        "--schedule",
+        type=str,
+        default=None,
+        metavar="HH:MM",
+        help="Run daily at the specified local time (e.g. 10:30). "
+             "The process stays alive and repeats every day. "
+             "Omit to run once and exit.",
+    )
+    args = parser.parse_args()
+
+    if args.schedule is None:
+        # Single run mode
+        run_once()
+    else:
+        # Scheduled mode — validate time format
+        try:
+            parts = args.schedule.split(":")
+            h, m = int(parts[0]), int(parts[1])
+            if not (0 <= h <= 23 and 0 <= m <= 59):
+                raise ValueError
+            time_str = f"{h:02d}:{m:02d}"
+        except (ValueError, IndexError):
+            print(f"❌ Invalid time format: '{args.schedule}'. Use HH:MM (e.g. 10:30)")
+            return
+
+        print(f"⏰ Scheduled mode: will run daily at {time_str}")
+        print(f"   Press Ctrl+C to stop.\n")
+
+        # Run immediately on first start, then schedule
+        print("▶ Running initial execution...")
+        try:
+            run_once()
+        except Exception as e:
+            print(f"⚠ Initial run failed: {e}")
+
+        # Set up daily schedule
+        schedule.every().day.at(time_str).do(run_once)
+
+        print(f"\n⏳ Next run scheduled at {time_str}. Waiting...")
+        try:
+            while True:
+                schedule.run_pending()
+                time.sleep(30)
+        except KeyboardInterrupt:
+            print("\n👋 Scheduler stopped.")
 
 
 if __name__ == "__main__":
