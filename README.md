@@ -64,7 +64,7 @@ screen -dmS arxiv python main.py --schedule 10:30
 ```
 请帮我部署 arxiv-daily-pusher 项目，步骤如下：
 
-1. 克隆仓库：git clone https://github.com/YOUR_USERNAME/arxiv-daily-pusher.git
+1. 克隆仓库：git clone https://github.com/VentaoZzz/arxiv-daily-pusher.git
 2. 进入目录：cd arxiv-daily-pusher
 3. 安装 Python 依赖：pip install -r requirements.txt
 4. 复制配置模板：cp config.example.yaml config.yaml
